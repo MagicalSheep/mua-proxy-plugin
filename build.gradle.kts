@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "cn.magicalsheep"
-version = "0.1.1-SNAPSHOT"
+version = "0.1.2-SNAPSHOT"
 
 repositories {
     maven {
@@ -19,6 +19,7 @@ repositories {
 
 dependencies {
     implementation("io.javalin:javalin:5.3.2")
+    implementation("commons-validator:commons-validator:1.7")
     compileOnly("com.velocitypowered:velocity-api:3.1.1")
     kapt("com.velocitypowered:velocity-api:3.1.1")
 }

@@ -4,8 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="805e3719-0ce8-454c-a9c2-6e4fc0a18006" name="变更" comment="Initialize project">
-      <change afterPath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/ServerCommand.kt" afterDir="false" />
+    <list default="true" id="805e3719-0ce8-454c-a9c2-6e4fc0a18006" name="变更" comment="Minor changes">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/Main.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/Main.kt" afterDir="false" />
@@ -214,6 +213,8 @@
       <workItem from="1674895170890" duration="9696000" />
       <workItem from="1675059671763" duration="4229000" />
       <workItem from="1675139885125" duration="952000" />
+      <workItem from="1675143915171" duration="436000" />
+      <workItem from="1675174581684" duration="3415000" />
     </task>
     <task id="LOCAL-00001" summary="Initialize project">
       <created>1674907855565</created>
@@ -222,7 +223,14 @@
       <option name="project" value="LOCAL" />
       <updated>1674907855565</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Minor changes">
+      <created>1675144277877</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1675144277878</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -235,6 +243,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Initialize project" />
-    <option name="LAST_COMMIT_MESSAGE" value="Initialize project" />
+    <MESSAGE value="Minor changes" />
+    <option name="LAST_COMMIT_MESSAGE" value="Minor changes" />
   </component>
 </project>

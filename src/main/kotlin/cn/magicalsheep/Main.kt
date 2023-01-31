@@ -16,23 +16,42 @@ import cn.magicalsheep.request.FrpRequest
 import cn.magicalsheep.request.NewProxy
 import cn.magicalsheep.response.FrpResponse
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent
+import com.velocitypowered.api.plugin.annotation.DataDirectory
+import org.apache.commons.validator.routines.InetAddressValidator
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.lang.Exception
 import java.lang.reflect.Type
 import java.net.InetSocketAddress
+import java.nio.file.Path
+import java.util.Properties
+import kotlin.io.path.exists
 
 @Plugin(
     id = "mua-proxy-plugin",
     name = "MUA Union Proxy Plugin",
-    version = "0.1.1-SNAPSHOT",
+    version = "0.1.2-SNAPSHOT",
     url = "https://github.com/MagicalSheep/mua-proxy-plugin",
     description = "Register server when frp gets a new proxy connection",
     authors = ["MagicalSheep"]
 )
-class Main @Inject constructor(private val server: ProxyServer, private val logger: Logger) {
+class Main @Inject constructor(
+    private val server: ProxyServer,
+    private val logger: Logger,
+    @DataDirectory dataDirectory: Path
+) {
 
     companion object {
-        const val PORT = 10086 // too lazy to write configuration
+        const val CONFIG_NAME = "config.properties"
+        const val DEFAULT_PORT = 8080
+        const val DEFAULT_FRP_ADDRESS = "127.0.0.1"
+        const val PORT_CONFIG = "port"
+        const val FRP_ADDRESS_CONFIG = "frp_address"
     }
 
+    private var port = DEFAULT_PORT
+    private var frpAddress = DEFAULT_FRP_ADDRESS
     private val api: Javalin
 
     private val gson = GsonBuilder().create()
@@ -55,12 +74,12 @@ class Main @Inject constructor(private val server: ProxyServer, private val logg
             ctx.json(FrpResponse(reject = true, rejectReason = "Server name <${req.proxyName}> is already in use"))
             return
         }
-        if (req.remotePort == PORT || server.allServers.any { it.serverInfo.address.port == req.remotePort }) {
+        if (req.remotePort == port || server.allServers.any { it.serverInfo.address.port == req.remotePort }) {
             ctx.json(FrpResponse(reject = true, rejectReason = "Remote port ${req.remotePort} is already in use"))
             return
         }
         val registeredServer =
-            server.registerServer(ServerInfo(req.proxyName, InetSocketAddress("127.0.0.1", req.remotePort)))
+            server.registerServer(ServerInfo(req.proxyName, InetSocketAddress(frpAddress, req.remotePort)))
         logger.info("${registeredServer.serverInfo} registered")
         ctx.json(FrpResponse(reject = false, unchanged = true))
     }
@@ -80,12 +99,32 @@ class Main @Inject constructor(private val server: ProxyServer, private val logg
         }
             .post("/register") { ctx -> register(ctx) }
             .post("/unregister") { ctx -> unregister(ctx) }
+
+        val properties = Properties()
+        if (!dataDirectory.exists()) {
+            File(dataDirectory.toUri()).mkdir()
+        }
+        val config = File(dataDirectory.resolve(CONFIG_NAME).toUri())
+        if (config.createNewFile()) {
+            properties[PORT_CONFIG] = DEFAULT_PORT.toString()
+            properties[FRP_ADDRESS_CONFIG] = DEFAULT_FRP_ADDRESS
+            properties.store(FileOutputStream(config), "MUA Proxy Plugin Configuration")
+        } else {
+            properties.load(FileInputStream(config))
+            try {
+                port = properties.getProperty(PORT_CONFIG).toInt()
+                frpAddress = properties.getProperty(FRP_ADDRESS_CONFIG) ?: DEFAULT_FRP_ADDRESS
+                InetAddressValidator.getInstance().isValidInet4Address(frpAddress)
+            } catch (ex: Exception) {
+                frpAddress = DEFAULT_FRP_ADDRESS
+            }
+        }
         logger.info("Loading MUA union proxy plugin...")
     }
 
     @Subscribe
     fun onProxyInitialization(event: ProxyInitializeEvent?) {
-        api.start(PORT)
+        api.start(port)
         logger.info("MUA union proxy plugin loaded")
     }
 
