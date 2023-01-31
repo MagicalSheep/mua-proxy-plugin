@@ -17,7 +17,6 @@ import cn.magicalsheep.request.NewProxy
 import cn.magicalsheep.response.FrpResponse
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent
 import com.velocitypowered.api.plugin.annotation.DataDirectory
-import org.apache.commons.validator.routines.InetAddressValidator
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -114,9 +113,8 @@ class Main @Inject constructor(
             try {
                 port = properties.getProperty(PORT_CONFIG).toInt()
                 frpAddress = properties.getProperty(FRP_ADDRESS_CONFIG) ?: DEFAULT_FRP_ADDRESS
-                InetAddressValidator.getInstance().isValidInet4Address(frpAddress)
             } catch (ex: Exception) {
-                frpAddress = DEFAULT_FRP_ADDRESS
+                // ignored
             }
         }
         logger.info("Loading MUA union proxy plugin...")
