@@ -22,12 +22,16 @@ import java.net.InetSocketAddress
 @Plugin(
     id = "mua-proxy-plugin",
     name = "MUA Union Proxy Plugin",
-    version = "0.1.0-SNAPSHOT",
+    version = "0.1.1-SNAPSHOT",
     url = "https://github.com/MagicalSheep/mua-proxy-plugin",
     description = "Register server when frp gets a new proxy connection",
     authors = ["MagicalSheep"]
 )
 class Main @Inject constructor(private val server: ProxyServer, private val logger: Logger) {
+
+    companion object {
+        const val PORT = 10086 // too lazy to write configuration
+    }
 
     private val api: Javalin
 
@@ -43,10 +47,6 @@ class Main @Inject constructor(private val server: ProxyServer, private val logg
     private fun register(ctx: Context) {
         val req =
             ctx.bodyAsClass<FrpRequest<NewProxy>>(getType(FrpRequest::class.java, NewProxy::class.java)).content
-        if (req.proxyName == "lobby") {
-            ctx.json(FrpResponse(reject = true, rejectReason = "Proxy name cannot be <lobby>"))
-            return
-        }
         if (req.proxyType != "tcp") {
             ctx.json(FrpResponse(reject = true, rejectReason = "Proxy type must be TCP"))
             return
@@ -55,7 +55,7 @@ class Main @Inject constructor(private val server: ProxyServer, private val logg
             ctx.json(FrpResponse(reject = true, rejectReason = "Server name <${req.proxyName}> is already in use"))
             return
         }
-        if (server.allServers.any { it.serverInfo.address.port == req.remotePort }) {
+        if (req.remotePort == PORT || server.allServers.any { it.serverInfo.address.port == req.remotePort }) {
             ctx.json(FrpResponse(reject = true, rejectReason = "Remote port ${req.remotePort} is already in use"))
             return
         }
@@ -85,7 +85,7 @@ class Main @Inject constructor(private val server: ProxyServer, private val logg
 
     @Subscribe
     fun onProxyInitialization(event: ProxyInitializeEvent?) {
-        api.start(10086) // too lazy to write configuration
+        api.start(PORT)
         logger.info("MUA union proxy plugin loaded")
     }
 
