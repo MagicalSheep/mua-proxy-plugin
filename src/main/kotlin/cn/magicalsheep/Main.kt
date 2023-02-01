@@ -30,11 +30,13 @@ import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.Exception
 import kotlin.io.path.exists
+import kotlin.math.max
+import kotlin.math.min
 
 @Plugin(
     id = "mua-proxy-plugin",
     name = "MUA Union Proxy Plugin",
-    version = "0.2.0-SNAPSHOT",
+    version = "0.2.1-SNAPSHOT",
     url = "https://github.com/MagicalSheep/mua-proxy-plugin",
     description = "Register server when frp gets a new proxy connection",
     authors = ["MagicalSheep"]
@@ -49,9 +51,15 @@ class Main @Inject constructor(
         const val CONFIG_NAME = "config.properties"
         const val DEFAULT_PORT = 8080
         const val DEFAULT_FRP_ADDRESS = "127.0.0.1"
+        const val DEFAULT_RESTRICT_PORT = false
+        const val DEFAULT_AVAILABLE_MIN_PORT = 10000
+        const val DEFAULT_AVAILABLE_MAX_PORT = 19999
+        const val DEFAULT_AVAILABLE_PORTS = "$DEFAULT_AVAILABLE_MIN_PORT-$DEFAULT_AVAILABLE_MAX_PORT"
 
         const val CONFIG_PORT_FIELD = "port"
         const val CONFIG_FRP_ADDRESS_FIELD = "frp_address"
+        const val CONFIG_RESTRICT_PORT_FIELD = "restrict_port"
+        const val CONFIG_AVAILABLE_PORTS_FIELD = "available_ports"
 
         const val META_DOMAIN = "domain"
         const val META_FORCED_HOSTS = "forced_hosts"
@@ -59,6 +67,9 @@ class Main @Inject constructor(
 
     private var port = DEFAULT_PORT
     private var frpAddress = DEFAULT_FRP_ADDRESS
+    private var isRestrictPort = DEFAULT_RESTRICT_PORT
+    private var availableMinPort = DEFAULT_AVAILABLE_MIN_PORT
+    private var availableMaxPort = DEFAULT_AVAILABLE_MAX_PORT
 
     private val api: Javalin
     private val forcedHosts = ConcurrentHashMap<String, ImmutableList<String>>()
@@ -127,6 +138,15 @@ class Main @Inject constructor(
     private fun register(ctx: Context) {
         val req =
             ctx.bodyAsClass<FrpRequest<NewProxy>>(getType(FrpRequest::class.java, NewProxy::class.java)).content
+        if (isRestrictPort && req.remotePort !in availableMinPort..availableMaxPort) {
+            ctx.json(
+                FrpResponse(
+                    reject = true,
+                    rejectReason = "You can only use remote ports from $availableMinPort to $availableMaxPort"
+                )
+            )
+            return
+        }
         if (req.proxyType != "tcp") {
             ctx.json(FrpResponse(reject = true, rejectReason = "Proxy type must be TCP"))
             return
@@ -192,12 +212,25 @@ class Main @Inject constructor(
         if (config.createNewFile()) {
             properties[CONFIG_PORT_FIELD] = DEFAULT_PORT.toString()
             properties[CONFIG_FRP_ADDRESS_FIELD] = DEFAULT_FRP_ADDRESS
+            properties[CONFIG_RESTRICT_PORT_FIELD] = DEFAULT_RESTRICT_PORT.toString()
+            properties[CONFIG_AVAILABLE_PORTS_FIELD] = DEFAULT_AVAILABLE_PORTS
             properties.store(FileOutputStream(config), "MUA Proxy Plugin Configuration")
         } else {
             properties.load(FileInputStream(config))
             try {
                 port = properties.getProperty(CONFIG_PORT_FIELD).toInt()
                 frpAddress = properties.getProperty(CONFIG_FRP_ADDRESS_FIELD) ?: DEFAULT_FRP_ADDRESS
+                isRestrictPort = properties.getProperty(CONFIG_RESTRICT_PORT_FIELD).toBoolean()
+                val rawPorts = properties.getProperty(CONFIG_AVAILABLE_PORTS_FIELD)
+                if (rawPorts != null) {
+                    val tmpList = rawPorts.split("-")
+                    if (tmpList.size >= 2) {
+                        val val0 = tmpList[0].toInt()
+                        val val1 = tmpList[1].toInt()
+                        availableMinPort = min(val0, val1)
+                        availableMaxPort = max(val0, val1)
+                    }
+                }
             } catch (ex: Exception) {
                 // ignored
             }

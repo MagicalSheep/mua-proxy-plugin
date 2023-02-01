@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "cn.magicalsheep"
-version = "0.2.0-SNAPSHOT"
+version = "0.2.1-SNAPSHOT"
 
 repositories {
     maven {
