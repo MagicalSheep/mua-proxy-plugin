@@ -1,6 +1,9 @@
 # MUA-Proxy-Plugin
 
-将代理服务器列表与 [frp](https://github.com/fatedier/frp) 节点进行同步的 [Velocity](https://github.com/PaperMC/Velocity) 插件，简单、安全地通过 frp 动态增减子服，组建联合 Minecraft 服务器。
+将代理服务器列表与 [frp](https://github.com/fatedier/frp) 节点进行同步的 [Velocity](https://github.com/PaperMC/Velocity)
+插件，简单、安全地通过 frp 动态增减子服，组建联合 Minecraft 服务器。
+
+可在 [MUA Wiki 页](https://wiki.mualliance.ltd/%E8%81%94%E5%90%88%E5%A4%A7%E5%8E%85) 中阅读更多关于该插件的具体实践方案。
 
 ![](/structure.png)
 
@@ -33,8 +36,11 @@ path = /login
 ops = Login
 ```
 
-每一个接入 frp 服务端的代理节点，都将被视作一个 Minecraft 服务器自动热更新至 Velocity 的代理服务器列表中。当 frp 代理节点断开时，也将自动从 Velocity 的代理服务器列表中移除。
+每一个接入 frp 服务端的代理节点，都将被视作一个 Minecraft 服务器自动热更新至 Velocity 的代理服务器列表中。当 frp
+代理节点断开时，也将自动从 Velocity 的代理服务器列表中移除。
 
 ## 注意事项
 
-请确保运行 frp 服务端的服务器网络仅开放管理端口，否则将引起安全问题。推荐使用 [Docker 桥接网络](https://docs.docker.com/network/bridge/) 运行 Velocity 与 frp 服务端。
+请确保运行 frp
+服务端的服务器网络仅开放管理端口，否则将引起安全问题。推荐使用 [Docker 桥接网络](https://docs.docker.com/network/bridge/)
+运行 Velocity 与 frp 服务端。
