@@ -18,17 +18,17 @@
 
 ```ini
 [plugin.register]
-addr = 127.0.0.1:10086
+addr = 127.0.0.1:8080
 path = /register
 ops = NewProxy
 
 [plugin.unregister]
-addr = 127.0.0.1:10086
+addr = 127.0.0.1:8080
 path = /unregister
 ops = CloseProxy
 
 [plugin.login]
-addr = 127.0.0.1:10086
+addr = 127.0.0.1:8080
 path = /login
 ops = Login
 ```

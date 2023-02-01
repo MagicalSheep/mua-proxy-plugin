@@ -4,14 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="805e3719-0ce8-454c-a9c2-6e4fc0a18006" name="变更" comment="Remove dependency">
-      <change afterPath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/request/Login.kt" afterDir="false" />
+    <list default="true" id="805e3719-0ce8-454c-a9c2-6e4fc0a18006" name="变更" comment="Hot update forced hosts list">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/Main.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/Main.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/request/NewProxy.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/request/NewProxy.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/request/User.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/request/User.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -219,7 +213,7 @@
       <workItem from="1675139885125" duration="952000" />
       <workItem from="1675143915171" duration="436000" />
       <workItem from="1675174581684" duration="4147000" />
-      <workItem from="1675183060799" duration="12595000" />
+      <workItem from="1675183060799" duration="13993000" />
     </task>
     <task id="LOCAL-00001" summary="Initialize project">
       <created>1674907855565</created>
@@ -249,7 +243,14 @@
       <option name="project" value="LOCAL" />
       <updated>1675179364486</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="Hot update forced hosts list">
+      <created>1675229733660</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1675229733660</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -265,6 +266,7 @@
     <MESSAGE value="Minor changes" />
     <MESSAGE value="Add configuration" />
     <MESSAGE value="Remove dependency" />
-    <option name="LAST_COMMIT_MESSAGE" value="Remove dependency" />
+    <MESSAGE value="Hot update forced hosts list" />
+    <option name="LAST_COMMIT_MESSAGE" value="Hot update forced hosts list" />
   </component>
 </project>
