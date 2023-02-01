@@ -4,9 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="805e3719-0ce8-454c-a9c2-6e4fc0a18006" name="变更" comment="Add configuration">
+    <list default="true" id="805e3719-0ce8-454c-a9c2-6e4fc0a18006" name="变更" comment="Remove dependency">
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/request/Login.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/Main.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/Main.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/request/NewProxy.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/request/NewProxy.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/request/User.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/cn/magicalsheep/request/User.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -59,8 +64,8 @@
     <option name="RECENT_TEMPLATES">
       <list>
         <option value="Kotlin File" />
-        <option value="Kotlin Data Class" />
         <option value="Kotlin Class" />
+        <option value="Kotlin Data Class" />
       </list>
     </option>
   </component>
@@ -213,7 +218,8 @@
       <workItem from="1675059671763" duration="4229000" />
       <workItem from="1675139885125" duration="952000" />
       <workItem from="1675143915171" duration="436000" />
-      <workItem from="1675174581684" duration="3741000" />
+      <workItem from="1675174581684" duration="4147000" />
+      <workItem from="1675183060799" duration="12595000" />
     </task>
     <task id="LOCAL-00001" summary="Initialize project">
       <created>1674907855565</created>
@@ -236,7 +242,14 @@
       <option name="project" value="LOCAL" />
       <updated>1675178956073</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Remove dependency">
+      <created>1675179364486</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1675179364486</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -251,6 +264,7 @@
     <MESSAGE value="Initialize project" />
     <MESSAGE value="Minor changes" />
     <MESSAGE value="Add configuration" />
-    <option name="LAST_COMMIT_MESSAGE" value="Add configuration" />
+    <MESSAGE value="Remove dependency" />
+    <option name="LAST_COMMIT_MESSAGE" value="Remove dependency" />
   </component>
 </project>

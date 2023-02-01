@@ -26,6 +26,11 @@ ops = NewProxy
 addr = 127.0.0.1:10086
 path = /unregister
 ops = CloseProxy
+
+[plugin.login]
+addr = 127.0.0.1:10086
+path = /login
+ops = Login
 ```
 
 每一个接入 frp 服务端的代理节点，都将被视作一个 Minecraft 服务器自动热更新至 Velocity 的代理服务器列表中。当 frp 代理节点断开时，也将自动从 Velocity 的代理服务器列表中移除。
