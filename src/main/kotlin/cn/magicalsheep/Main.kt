@@ -53,6 +53,7 @@ class Main @Inject constructor(
         }
     }
 
+    private val initServers: Set<String>
     private val config = Configuration()
     private var api: Javalin
     private val frpServer: FrpServer
@@ -77,6 +78,16 @@ class Main @Inject constructor(
             ctx.json(FrpResponse(reject = false, unchanged = true))
             return
         }
+        // check forced hosts alias meta
+        val domainAlias = if (metas.containsKey(META_DOMAIN_ALIAS)) {
+            try {
+                gson.fromJson<List<String>>(metas[META_DOMAIN_ALIAS], getType(List::class.java, String::class.java))
+            } catch (ex: Exception) {
+                listOf()
+            }
+        } else {
+            listOf()
+        }
 
         val hosts = metas[META_FORCED_HOSTS]
         try {
@@ -96,7 +107,10 @@ class Main @Inject constructor(
 //                return
 //            }
             // override it
-            forcedHosts[domain] = ImmutableList.copyOf(hostsList)
+            val tmpMap = HashMap<String, ImmutableList<String>>()
+            tmpMap[domain] = ImmutableList.copyOf(hostsList)
+            domainAlias.forEach { tmpMap[it] = ImmutableList.copyOf(hostsList) }
+            forcedHosts.putAll(tmpMap)
             try {
                 updateForcedHosts(ImmutableMap.copyOf(forcedHosts))
             } catch (ex: Exception) {
@@ -113,6 +127,9 @@ class Main @Inject constructor(
                 return
             }
             logger.info("Register forced hosts for domain <$domain>: $hostsList")
+            if (domainAlias.isNotEmpty()) {
+                logger.info("Register alias for domain <$domain>: $domainAlias")
+            }
             ctx.json(FrpResponse(reject = false, unchanged = true))
         } catch (ex: Exception) {
             ctx.json(FrpResponse(reject = true, rejectReason = "Invalid forced hosts syntax"))
@@ -161,7 +178,19 @@ class Main @Inject constructor(
         // remove forced hosts if needed
         val metas = req.user.metas ?: return
         if (!metas.containsKey(META_DOMAIN) || !metas.containsKey(META_FORCED_HOSTS)) return
-        val domain = metas[META_DOMAIN]
+        val domain = metas[META_DOMAIN] ?: return
+        val domainAlias = if (metas.containsKey(META_DOMAIN_ALIAS)) {
+            try {
+                gson.fromJson<List<String>>(metas[META_DOMAIN_ALIAS], getType(List::class.java, String::class.java))
+            } catch (ex: Exception) {
+                listOf()
+            }
+        } else {
+            listOf()
+        }
+        // just check main domain because other domains are alias
+        // we assume that no domain override happens
+        // maybe fix it in the future
         if (!forcedHosts.containsKey(domain)) return
         val hosts = forcedHosts[domain] ?: return
         for (host in hosts) {
@@ -170,6 +199,7 @@ class Main @Inject constructor(
             }
         }
         forcedHosts.remove(domain)
+        domainAlias.forEach { forcedHosts.remove(it) }
         // if we can add forced hosts successfully, then it should not be failed
         try {
             updateForcedHosts(ImmutableMap.copyOf(forcedHosts))
@@ -178,6 +208,9 @@ class Main @Inject constructor(
             ex.printStackTrace()
         }
         logger.info("Unregister forced hosts for domain <$domain>: $hosts")
+        if (domainAlias.isNotEmpty()) {
+            logger.info("Unregister alias for domain <$domain>: $domainAlias")
+        }
     }
 
     private fun startFrp() {
@@ -216,6 +249,12 @@ class Main @Inject constructor(
     fun reload(isAllReload: Boolean = false) {
         logger.info("Reloading MUA union proxy plugin configuration...")
         if (isAllReload) {
+            server.allServers.forEach {
+                if (!initServers.contains(it.serverInfo.name))
+                    server.unregisterServer(it.serverInfo)
+            }
+            forcedHosts.clear()
+            updateForcedHosts(ImmutableMap.copyOf(forcedHosts))
             api.close()
             this.api = createApi()
         }
@@ -234,6 +273,7 @@ class Main @Inject constructor(
 
     init {
         logger.info("Loading MUA union proxy plugin...")
+        initServers = HashSet(server.allServers.map { it.serverInfo.name })
         if (!dataDirectory.exists()) {
             File(dataDirectory.toUri()).mkdir()
         }
