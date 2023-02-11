@@ -1,4 +1,4 @@
-package cn.magicalsheep.response
+package cn.magicalsheep.model.response
 
 import com.google.gson.annotations.SerializedName
 

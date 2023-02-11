@@ -1,5 +1,7 @@
 package cn.magicalsheep
 
+import cn.magicalsheep.command.ReloadCommand
+import cn.magicalsheep.model.Configuration
 import com.google.gson.GsonBuilder
 import com.google.inject.Inject
 import com.velocitypowered.api.event.Subscribe
@@ -11,67 +13,49 @@ import io.javalin.Javalin
 import io.javalin.http.Context
 import io.javalin.json.JsonMapper
 import org.slf4j.Logger
-import cn.magicalsheep.request.CloseProxy
-import cn.magicalsheep.request.FrpRequest
-import cn.magicalsheep.request.Login
-import cn.magicalsheep.request.NewProxy
-import cn.magicalsheep.response.FrpResponse
+import cn.magicalsheep.model.request.CloseProxy
+import cn.magicalsheep.model.request.FrpRequest
+import cn.magicalsheep.model.request.Login
+import cn.magicalsheep.model.request.NewProxy
+import cn.magicalsheep.model.response.FrpResponse
 import com.google.common.collect.ImmutableList
 import com.google.common.collect.ImmutableMap
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent
 import com.velocitypowered.api.plugin.annotation.DataDirectory
 import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
+import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 import java.net.InetSocketAddress
 import java.nio.file.Path
-import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.Exception
 import kotlin.io.path.exists
-import kotlin.math.max
-import kotlin.math.min
 
 @Plugin(
     id = "mua-proxy-plugin",
     name = "MUA Union Proxy Plugin",
-    version = "0.2.1-SNAPSHOT",
+    version = "0.3.0-SNAPSHOT",
     url = "https://github.com/MagicalSheep/mua-proxy-plugin",
     description = "Register server when frp gets a new proxy connection",
     authors = ["MagicalSheep"]
 )
 class Main @Inject constructor(
     private val server: ProxyServer,
-    private val logger: Logger,
-    @DataDirectory dataDirectory: Path
+    val logger: Logger,
+    @DataDirectory private val dataDirectory: Path
 ) {
 
     companion object {
-        const val CONFIG_NAME = "config.properties"
-        const val DEFAULT_PORT = 8080
-        const val DEFAULT_FRP_ADDRESS = "127.0.0.1"
-        const val DEFAULT_RESTRICT_PORT = false
-        const val DEFAULT_AVAILABLE_MIN_PORT = 10000
-        const val DEFAULT_AVAILABLE_MAX_PORT = 19999
-        const val DEFAULT_AVAILABLE_PORTS = "$DEFAULT_AVAILABLE_MIN_PORT-$DEFAULT_AVAILABLE_MAX_PORT"
-
-        const val CONFIG_PORT_FIELD = "port"
-        const val CONFIG_FRP_ADDRESS_FIELD = "frp_address"
-        const val CONFIG_RESTRICT_PORT_FIELD = "restrict_port"
-        const val CONFIG_AVAILABLE_PORTS_FIELD = "available_ports"
-
-        const val META_DOMAIN = "domain"
-        const val META_FORCED_HOSTS = "forced_hosts"
+        private fun getType(raw: Class<*>, vararg args: Type) = object : ParameterizedType {
+            override fun getRawType(): Type = raw
+            override fun getActualTypeArguments(): Array<out Type> = args
+            override fun getOwnerType(): Type? = null
+        }
     }
 
-    private var port = DEFAULT_PORT
-    private var frpAddress = DEFAULT_FRP_ADDRESS
-    private var isRestrictPort = DEFAULT_RESTRICT_PORT
-    private var availableMinPort = DEFAULT_AVAILABLE_MIN_PORT
-    private var availableMaxPort = DEFAULT_AVAILABLE_MAX_PORT
-
-    private val api: Javalin
+    private val config = Configuration()
+    private var api: Javalin
+    private val frpServer: FrpServer
     private val forcedHosts = ConcurrentHashMap<String, ImmutableList<String>>()
 
     private val gson = GsonBuilder().create()
@@ -138,11 +122,11 @@ class Main @Inject constructor(
     private fun register(ctx: Context) {
         val req =
             ctx.bodyAsClass<FrpRequest<NewProxy>>(getType(FrpRequest::class.java, NewProxy::class.java)).content
-        if (isRestrictPort && req.remotePort !in availableMinPort..availableMaxPort) {
+        if (config.isRestrictPort && req.remotePort !in config.availableMinPort..config.availableMaxPort) {
             ctx.json(
                 FrpResponse(
                     reject = true,
-                    rejectReason = "You can only use remote ports from $availableMinPort to $availableMaxPort"
+                    rejectReason = "You can only use remote ports from ${config.availableMinPort} to ${config.availableMaxPort}"
                 )
             )
             return
@@ -155,12 +139,12 @@ class Main @Inject constructor(
             ctx.json(FrpResponse(reject = true, rejectReason = "Server name <${req.proxyName}> is already in use"))
             return
         }
-        if (req.remotePort == port || server.allServers.any { it.serverInfo.address.port == req.remotePort }) {
+        if (req.remotePort == config.port || server.allServers.any { it.serverInfo.address.port == req.remotePort }) {
             ctx.json(FrpResponse(reject = true, rejectReason = "Remote port ${req.remotePort} is already in use"))
             return
         }
         val registeredServer =
-            server.registerServer(ServerInfo(req.proxyName, InetSocketAddress(frpAddress, req.remotePort)))
+            server.registerServer(ServerInfo(req.proxyName, InetSocketAddress(config.frpAddress, req.remotePort)))
         logger.info("${registeredServer.serverInfo} registered")
 
         ctx.json(FrpResponse(reject = false, unchanged = true))
@@ -196,46 +180,71 @@ class Main @Inject constructor(
         logger.info("Unregister forced hosts for domain <$domain>: $hosts")
     }
 
-    init {
-        this.api = Javalin.create {
+    private fun startFrp() {
+        if (!config.isFrpIntegration) return
+        try {
+            frpServer.start()
+        } catch (ex: Exception) {
+            logger.error(ex.message)
+            logger.error("Start frp server failed. Please start it manually or try to reload the plugin")
+        }
+    }
+
+    private fun stopFrp() {
+        if (!config.isFrpIntegration) return
+        try {
+            frpServer.stop()
+        } catch (ex: Exception) {
+            logger.error(ex.message)
+            logger.error("Plugin close the frp server failed")
+        }
+    }
+
+    private fun createApi(): Javalin {
+        return Javalin.create {
             it.jsonMapper(gsonMapper)
         }
             .post("/register") { ctx -> register(ctx) }
             .post("/unregister") { ctx -> unregister(ctx) }
             .post("/login") { ctx -> login(ctx) }
+            .events { event ->
+                event.serverStarted { startFrp() }
+                event.serverStopped { stopFrp() }
+            }
+    }
 
-        val properties = Properties()
+    fun reload(isAllReload: Boolean = false) {
+        logger.info("Reloading MUA union proxy plugin configuration...")
+        if (isAllReload) {
+            api.close()
+            this.api = createApi()
+        }
+        try {
+            val configFile = File(dataDirectory.resolve(CONFIG_NAME).toUri())
+            config.load(configFile)
+        } catch (ex: Exception) {
+            logger.error("Failed to reload configuration: ${ex.message}")
+            return
+        }
+        frpServer.frpPath = config.frpPath
+        frpServer.frpConfigPath = config.frpConfigPath
+        if (isAllReload) api.start(config.port)
+        logger.info("Reload configuration completed")
+    }
+
+    init {
+        logger.info("Loading MUA union proxy plugin...")
         if (!dataDirectory.exists()) {
             File(dataDirectory.toUri()).mkdir()
         }
-        val config = File(dataDirectory.resolve(CONFIG_NAME).toUri())
-        if (config.createNewFile()) {
-            properties[CONFIG_PORT_FIELD] = DEFAULT_PORT.toString()
-            properties[CONFIG_FRP_ADDRESS_FIELD] = DEFAULT_FRP_ADDRESS
-            properties[CONFIG_RESTRICT_PORT_FIELD] = DEFAULT_RESTRICT_PORT.toString()
-            properties[CONFIG_AVAILABLE_PORTS_FIELD] = DEFAULT_AVAILABLE_PORTS
-            properties.store(FileOutputStream(config), "MUA Proxy Plugin Configuration")
-        } else {
-            properties.load(FileInputStream(config))
-            try {
-                port = properties.getProperty(CONFIG_PORT_FIELD).toInt()
-                frpAddress = properties.getProperty(CONFIG_FRP_ADDRESS_FIELD) ?: DEFAULT_FRP_ADDRESS
-                isRestrictPort = properties.getProperty(CONFIG_RESTRICT_PORT_FIELD).toBoolean()
-                val rawPorts = properties.getProperty(CONFIG_AVAILABLE_PORTS_FIELD)
-                if (rawPorts != null) {
-                    val tmpList = rawPorts.split("-")
-                    if (tmpList.size >= 2) {
-                        val val0 = tmpList[0].toInt()
-                        val val1 = tmpList[1].toInt()
-                        availableMinPort = min(val0, val1)
-                        availableMaxPort = max(val0, val1)
-                    }
-                }
-            } catch (ex: Exception) {
-                // ignored
-            }
+        val configFile = File(dataDirectory.resolve(CONFIG_NAME).toUri())
+        try {
+            config.load(configFile)
+        } catch (ex: Exception) {
+            logger.error("Failed to load configuration: ${ex.message}")
         }
-        logger.info("Loading MUA union proxy plugin...")
+        frpServer = FrpServer(config.frpPath, config.frpConfigPath)
+        this.api = createApi()
     }
 
     @Throws(ClassNotFoundException::class, NoSuchFieldException::class, Exception::class)
@@ -252,14 +261,17 @@ class Main @Inject constructor(
     }
 
     @Subscribe
+    @Suppress("UNUSED_PARAMETER")
     fun onProxyInitialization(event: ProxyInitializeEvent?) {
-        api.start(port)
+        api.start(config.port)
+        server.commandManager.register("muaproxy", ReloadCommand(this), "muap")
         logger.info("MUA union proxy plugin loaded")
     }
 
     @Subscribe
+    @Suppress("UNUSED_PARAMETER")
     fun onProxyShutdown(event: ProxyShutdownEvent?) {
-        api.stop()
+        api.close()
         logger.info("MUA union proxy plugin exited")
     }
 

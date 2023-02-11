@@ -1,4 +1,4 @@
-package cn.magicalsheep.request
+package cn.magicalsheep.model.request
 
 import com.google.gson.annotations.SerializedName
 
