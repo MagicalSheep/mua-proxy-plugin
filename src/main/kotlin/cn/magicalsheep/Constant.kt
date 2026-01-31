@@ -22,3 +22,4 @@ const val CONFIG_FRP_CONFIG_PATH_FIELD = "frp_config_path"
 const val META_DOMAIN = "domain"
 const val META_FORCED_HOSTS = "forced_hosts"
 const val META_DOMAIN_ALIAS = "domain_alias"
+const val FORCED_HOSTS_GRACE_MS = 1000L

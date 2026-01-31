@@ -58,6 +58,7 @@ class Main @Inject constructor(
     private var api: Javalin
     private val frpServer: FrpServer
     private val forcedHosts = ConcurrentHashMap<String, ImmutableList<String>>()
+    private val forcedHostsUpdateAt = ConcurrentHashMap<String, Long>()
 
     private val gson = GsonBuilder().create()
     private val gsonMapper = object : JsonMapper {
@@ -126,6 +127,9 @@ class Main @Inject constructor(
                 ex.printStackTrace()
                 return
             }
+            val now = System.currentTimeMillis()
+            forcedHostsUpdateAt[domain] = now
+            domainAlias.forEach { forcedHostsUpdateAt[it] = now }
             logger.info("Register forced hosts for domain <$domain>: $hostsList")
             if (domainAlias.isNotEmpty()) {
                 logger.info("Register alias for domain <$domain>: $domainAlias")
@@ -192,6 +196,8 @@ class Main @Inject constructor(
         // we assume that no domain override happens
         // maybe fix it in the future
         if (!forcedHosts.containsKey(domain)) return
+        val lastUpdateAt = forcedHostsUpdateAt[domain]
+        if (lastUpdateAt != null && System.currentTimeMillis() - lastUpdateAt < FORCED_HOSTS_GRACE_MS) return
         val hosts = forcedHosts[domain] ?: return
         for (host in hosts) {
             if (server.allServers.any { it.serverInfo.name == host }) {
@@ -200,6 +206,8 @@ class Main @Inject constructor(
         }
         forcedHosts.remove(domain)
         domainAlias.forEach { forcedHosts.remove(it) }
+        forcedHostsUpdateAt.remove(domain)
+        domainAlias.forEach { forcedHostsUpdateAt.remove(it) }
         // if we can add forced hosts successfully, then it should not be failed
         try {
             updateForcedHosts(ImmutableMap.copyOf(forcedHosts))
@@ -254,6 +262,7 @@ class Main @Inject constructor(
                     server.unregisterServer(it.serverInfo)
             }
             forcedHosts.clear()
+            forcedHostsUpdateAt.clear()
             updateForcedHosts(ImmutableMap.copyOf(forcedHosts))
             api.close()
             this.api = createApi()
