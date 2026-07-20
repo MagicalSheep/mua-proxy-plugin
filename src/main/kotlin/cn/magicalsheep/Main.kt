@@ -27,6 +27,7 @@ import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 import java.net.InetSocketAddress
 import java.nio.file.Path
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.Exception
 import kotlin.io.path.exists
@@ -34,7 +35,7 @@ import kotlin.io.path.exists
 @Plugin(
     id = "mua-proxy-plugin",
     name = "MUA Union Proxy Plugin",
-    version = "0.3.0-SNAPSHOT",
+    version = "0.3.1-SNAPSHOT",
     url = "https://github.com/MagicalSheep/mua-proxy-plugin",
     description = "Register server when frp gets a new proxy connection",
     authors = ["MagicalSheep"]
@@ -44,6 +45,11 @@ class Main @Inject constructor(
     val logger: Logger,
     @DataDirectory private val dataDirectory: Path
 ) {
+
+    private data class ForcedHostsState(
+        val generation: String,
+        val hasRegisteredHost: Boolean = false
+    )
 
     companion object {
         private fun getType(raw: Class<*>, vararg args: Type) = object : ParameterizedType {
@@ -58,6 +64,8 @@ class Main @Inject constructor(
     private var api: Javalin
     private val frpServer: FrpServer
     private val forcedHosts = ConcurrentHashMap<String, ImmutableList<String>>()
+    private val forcedHostsLock = Any()
+    private val forcedHostsStates = HashMap<String, ForcedHostsState>()
 
     private val gson = GsonBuilder().create()
     private val gsonMapper = object : JsonMapper {
@@ -110,27 +118,37 @@ class Main @Inject constructor(
             val tmpMap = HashMap<String, ImmutableList<String>>()
             tmpMap[domain] = ImmutableList.copyOf(hostsList)
             domainAlias.forEach { tmpMap[it] = ImmutableList.copyOf(hostsList) }
-            forcedHosts.putAll(tmpMap)
-            try {
-                updateForcedHosts(ImmutableMap.copyOf(forcedHosts))
-            } catch (ex: Exception) {
-                // rollback
-                forcedHosts.remove(domain)
-                ctx.json(
-                    FrpResponse(
-                        reject = true,
-                        rejectReason = "There is an error when update forced hosts, please contact administrator. (${ex.message})"
+            val generation = UUID.randomUUID().toString()
+            synchronized(forcedHostsLock) {
+                forcedHosts.putAll(tmpMap)
+                try {
+                    updateForcedHosts(ImmutableMap.copyOf(forcedHosts))
+                } catch (ex: Exception) {
+                    // rollback
+                    forcedHosts.remove(domain)
+                    ctx.json(
+                        FrpResponse(
+                            reject = true,
+                            rejectReason = "There is an error when update forced hosts, please contact administrator. (${ex.message})"
+                        )
                     )
-                )
-                logger.error("Error happen when try to update the forced hosts, this is often caused by updating Velocity")
-                ex.printStackTrace()
-                return
+                    logger.error("Error happen when try to update the forced hosts, this is often caused by updating Velocity")
+                    ex.printStackTrace()
+                    return
+                }
+                forcedHostsStates[domain] = ForcedHostsState(generation)
             }
             logger.info("Register forced hosts for domain <$domain>: $hostsList")
             if (domainAlias.isNotEmpty()) {
                 logger.info("Register alias for domain <$domain>: $domainAlias")
             }
-            ctx.json(FrpResponse(reject = false, unchanged = true))
+            ctx.json(
+                FrpResponse(
+                    reject = false,
+                    unchanged = false,
+                    content = req.copy(metas = metas + (META_GENERATION to generation))
+                )
+            )
         } catch (ex: Exception) {
             ctx.json(FrpResponse(reject = true, rejectReason = "Invalid forced hosts syntax"))
         }
@@ -164,6 +182,18 @@ class Main @Inject constructor(
             server.registerServer(ServerInfo(req.proxyName, InetSocketAddress(config.frpAddress, req.remotePort)))
         logger.info("${registeredServer.serverInfo} registered")
 
+        val metas = req.user.metas
+        val domain = metas?.get(META_DOMAIN)
+        val generation = metas?.get(META_GENERATION)
+        if (domain != null && generation != null) {
+            synchronized(forcedHostsLock) {
+                val state = forcedHostsStates[domain]
+                if (state?.generation == generation && forcedHosts[domain]?.contains(req.proxyName) == true) {
+                    forcedHostsStates[domain] = state.copy(hasRegisteredHost = true)
+                }
+            }
+        }
+
         ctx.json(FrpResponse(reject = false, unchanged = true))
     }
 
@@ -175,9 +205,8 @@ class Main @Inject constructor(
         server.unregisterServer(target.serverInfo)
         logger.info("${target.serverInfo} unregistered")
 
-        // remove forced hosts if needed
-        val metas = req.user.metas ?: return
-        if (!metas.containsKey(META_DOMAIN) || !metas.containsKey(META_FORCED_HOSTS)) return
+        val metas = req.user.metas
+        if (metas == null || !metas.containsKey(META_DOMAIN) || !metas.containsKey(META_FORCED_HOSTS)) return
         val domain = metas[META_DOMAIN] ?: return
         val domainAlias = if (metas.containsKey(META_DOMAIN_ALIAS)) {
             try {
@@ -188,28 +217,30 @@ class Main @Inject constructor(
         } else {
             listOf()
         }
-        // just check main domain because other domains are alias
-        // we assume that no domain override happens
-        // maybe fix it in the future
-        if (!forcedHosts.containsKey(domain)) return
-        val hosts = forcedHosts[domain] ?: return
-        for (host in hosts) {
-            if (server.allServers.any { it.serverInfo.name == host }) {
+        synchronized(forcedHostsLock) {
+            val state = forcedHostsStates[domain] ?: return
+            val generation = metas[META_GENERATION]
+            if (state.generation != generation && !state.hasRegisteredHost) {
                 return
             }
-        }
-        forcedHosts.remove(domain)
-        domainAlias.forEach { forcedHosts.remove(it) }
-        // if we can add forced hosts successfully, then it should not be failed
-        try {
-            updateForcedHosts(ImmutableMap.copyOf(forcedHosts))
-        } catch (ex: Exception) {
-            logger.error("Cannot remove the forced hosts, it must be a bug")
-            ex.printStackTrace()
-        }
-        logger.info("Unregister forced hosts for domain <$domain>: $hosts")
-        if (domainAlias.isNotEmpty()) {
-            logger.info("Unregister alias for domain <$domain>: $domainAlias")
+            val hosts = forcedHosts[domain] ?: return
+            if (hosts.any { host -> server.allServers.any { it.serverInfo.name == host } }) {
+                return
+            }
+            forcedHosts.remove(domain)
+            domainAlias.forEach { forcedHosts.remove(it) }
+            forcedHostsStates.remove(domain)
+            // if we can add forced hosts successfully, then it should not be failed
+            try {
+                updateForcedHosts(ImmutableMap.copyOf(forcedHosts))
+            } catch (ex: Exception) {
+                logger.error("Cannot remove the forced hosts, it must be a bug")
+                ex.printStackTrace()
+            }
+            logger.info("Unregister forced hosts for domain <$domain>: $hosts")
+            if (domainAlias.isNotEmpty()) {
+                logger.info("Unregister alias for domain <$domain>: $domainAlias")
+            }
         }
     }
 
@@ -253,8 +284,11 @@ class Main @Inject constructor(
                 if (!initServers.contains(it.serverInfo.name))
                     server.unregisterServer(it.serverInfo)
             }
-            forcedHosts.clear()
-            updateForcedHosts(ImmutableMap.copyOf(forcedHosts))
+            synchronized(forcedHostsLock) {
+                forcedHosts.clear()
+                forcedHostsStates.clear()
+                updateForcedHosts(ImmutableMap.copyOf(forcedHosts))
+            }
             api.close()
             this.api = createApi()
         }
