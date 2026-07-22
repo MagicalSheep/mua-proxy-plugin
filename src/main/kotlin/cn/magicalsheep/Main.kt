@@ -48,7 +48,7 @@ class Main @Inject constructor(
 
     private data class ForcedHostsState(
         val generation: String,
-        val hasRegisteredHost: Boolean = false
+        val hasRegisterAttempt: Boolean = false
     )
 
     companion object {
@@ -142,21 +142,33 @@ class Main @Inject constructor(
             if (domainAlias.isNotEmpty()) {
                 logger.info("Register alias for domain <$domain>: $domainAlias")
             }
+            req.metas = metas + (META_GENERATION to generation)
             ctx.json(
                 FrpResponse(
                     reject = false,
                     unchanged = false,
-                    content = req.copy(metas = metas + (META_GENERATION to generation))
+                    content = req
                 )
             )
         } catch (ex: Exception) {
-            ctx.json(FrpResponse(reject = true, rejectReason = "Invalid forced hosts syntax"))
+            ctx.json(FrpResponse(reject = true, rejectReason = ex.message))
         }
     }
 
     private fun register(ctx: Context) {
         val req =
             ctx.bodyAsClass<FrpRequest<NewProxy>>(getType(FrpRequest::class.java, NewProxy::class.java)).content
+        val metas = req.user.metas
+        val domain = metas?.get(META_DOMAIN)
+        val generation = metas?.get(META_GENERATION)
+        if (domain != null && generation != null) {
+            synchronized(forcedHostsLock) {
+                val state = forcedHostsStates[domain]
+                if (state?.generation == generation && forcedHosts[domain]?.contains(req.proxyName) == true) {
+                    forcedHostsStates[domain] = state.copy(hasRegisterAttempt = true)
+                }
+            }
+        }
         if (config.isRestrictPort && req.remotePort !in config.availableMinPort..config.availableMaxPort) {
             ctx.json(
                 FrpResponse(
@@ -181,18 +193,6 @@ class Main @Inject constructor(
         val registeredServer =
             server.registerServer(ServerInfo(req.proxyName, InetSocketAddress(config.frpAddress, req.remotePort)))
         logger.info("${registeredServer.serverInfo} registered")
-
-        val metas = req.user.metas
-        val domain = metas?.get(META_DOMAIN)
-        val generation = metas?.get(META_GENERATION)
-        if (domain != null && generation != null) {
-            synchronized(forcedHostsLock) {
-                val state = forcedHostsStates[domain]
-                if (state?.generation == generation && forcedHosts[domain]?.contains(req.proxyName) == true) {
-                    forcedHostsStates[domain] = state.copy(hasRegisteredHost = true)
-                }
-            }
-        }
 
         ctx.json(FrpResponse(reject = false, unchanged = true))
     }
@@ -220,7 +220,7 @@ class Main @Inject constructor(
         synchronized(forcedHostsLock) {
             val state = forcedHostsStates[domain] ?: return
             val generation = metas[META_GENERATION]
-            if (state.generation != generation && !state.hasRegisteredHost) {
+            if (state.generation != generation && !state.hasRegisterAttempt) {
                 return
             }
             val hosts = forcedHosts[domain] ?: return

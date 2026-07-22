@@ -15,7 +15,7 @@ data class Login(
     val runId: String,
     @SerializedName(value = "pool_count")
     val poolCount: Int,
-    val metas: Map<String, String>?,
+    var metas: Map<String, String>?,
     @SerializedName(value = "client_address")
     val clientAddress: String
 )
